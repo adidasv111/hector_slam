@@ -348,15 +348,18 @@ public:
     float dy1 = intensities[0] - intensities[2];  //M(P00)-M(P01)
     float dy2 = intensities[1] - intensities[3];  //M(P10)-M(P11)
 
-    float xFacInv = (1.0f - factors[0]);
-    float yFacInv = (1.0f - factors[1]);
+    float xFacInv = (1.0f - factors[0]);  // = 1 - (x - x0) = 1 + x0 - x = x1 - x
+    float yFacInv = (1.0f - factors[1]);  // = 1 - (y - y0) = 1 + y0 - y = y1 - y
 
-    // result: vector = [M(Pm), dM/dx(Pm), dM/dy(Pm)]^T 
+    // result: vector = [M(Pm), dM/dx(Pm), dM/dy(Pm)]^T
+    // Note: x1-x0 = y1-y0 = 1
     return Eigen::Vector3f(
       ((intensities[0] * xFacInv + intensities[1] * factors[0]) * (yFacInv)) +
       ((intensities[2] * xFacInv + intensities[3] * factors[0]) * (factors[1])),
-      -((dx1 * xFacInv) + (dx2 * factors[0])),
-      -((dy1 * yFacInv) + (dy2 * factors[1]))
+      // -((dx1 * xFacInv) + (dx2 * factors[0])),
+      // -((dy1 * yFacInv) + (dy2 * factors[1]))
+      -((dx1 * yFacInv) + (dx2 * factors[1])),
+      -((dy1 * xFacInv) + (dy2 * factors[0]))
     );
   }
 
