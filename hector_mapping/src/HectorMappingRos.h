@@ -180,6 +180,7 @@ protected:
   bool p_use_tf_scan_transformation_;
   bool p_use_tf_pose_start_estimate_;
   bool p_map_with_known_poses_;
+  bool p_do_mapping_;
   bool p_timing_output_;
 
   bool p_use_static_map_;

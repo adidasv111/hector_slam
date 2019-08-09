@@ -80,6 +80,7 @@ HectorMappingRos::HectorMappingRos()
   private_nh_.param("use_tf_scan_transformation", p_use_tf_scan_transformation_,true);
   private_nh_.param("use_tf_pose_start_estimate", p_use_tf_pose_start_estimate_,false);
   private_nh_.param("map_with_known_poses", p_map_with_known_poses_, false);
+  private_nh_.param("do_mapping", p_do_mapping_, true);
 
   private_nh_.param("base_frame", p_base_frame_, std::string("base_link"));
   private_nh_.param("map_frame", p_map_frame_, std::string("map"));
@@ -189,6 +190,8 @@ HectorMappingRos::HectorMappingRos()
   ROS_INFO("HectorSM p_map_update_angle_threshold_: %f", p_map_update_angle_threshold_);
   ROS_INFO("HectorSM p_laser_z_min_value_: %f", p_laser_z_min_value_);
   ROS_INFO("HectorSM p_laser_z_max_value_: %f", p_laser_z_max_value_);
+  ROS_INFO("HectorSM map_with_known_poses: %f", p_map_with_known_poses_);
+  ROS_INFO("HectorSM do_mapping: %f", p_do_mapping_);
 
   scanSubscriber_ = node_.subscribe(p_scan_topic_, p_scan_subscriber_queue_size_, &HectorMappingRos::scanCallback, this);
   sysMsgSubscriber_ = node_.subscribe(p_sys_msg_topic_, 2, &HectorMappingRos::sysMsgCallback, this);
@@ -249,22 +252,26 @@ void HectorMappingRos::scanCallback(const sensor_msgs::LaserScan& scan)
 
   ros::WallTime startTime = ros::WallTime::now();
 
+  // run SLAM without considering tf scan transformation
   if (!p_use_tf_scan_transformation_)
   {
+    // transform LaserScan to DataContainer
     if (rosLaserScanToDataContainer(scan, laserScanContainer,slamProcessor->getScaleToMap()))
     {
-      slamProcessor->update(laserScanContainer,slamProcessor->getLastScanMatchPose());
+      slamProcessor->update(laserScanContainer,slamProcessor->getLastScanMatchPose(),false, p_do_mapping_);
     }
   }
+  // run SLAM
   else
   {
     ros::Duration dur (0.5);
-
+    // get base_link to sensor tf 
     if (tf_.waitForTransform(p_base_frame_,scan.header.frame_id, scan.header.stamp,dur))
     {
       tf::StampedTransform laserTransform;
       tf_.lookupTransform(p_base_frame_,scan.header.frame_id, scan.header.stamp, laserTransform);
 
+      // project laserScan to PCL
       //projector_.transformLaserScanToPointCloud(p_base_frame_ ,scan, pointCloud,tf_);
       projector_.projectLaser(scan, laser_point_cloud_,30.0);
 
@@ -274,6 +281,7 @@ void HectorMappingRos::scanCallback(const sensor_msgs::LaserScan& scan)
 
       Eigen::Vector3f startEstimate(Eigen::Vector3f::Zero());
 
+      // transform laser (as PCL) to DataContainer, with the sensor tf
       if(rosPointCloudToDataContainer(laser_point_cloud_, laserTransform, laserScanContainer, slamProcessor->getScaleToMap()))
       {
         if (initial_pose_set_){
@@ -281,6 +289,7 @@ void HectorMappingRos::scanCallback(const sensor_msgs::LaserScan& scan)
           startEstimate = initial_pose_;
         }else if (p_use_tf_pose_start_estimate_){
 
+          // get robot pose from tf and use as startEstimate
           try
           {
             tf::StampedTransform stamped_pose;
@@ -293,6 +302,7 @@ void HectorMappingRos::scanCallback(const sensor_msgs::LaserScan& scan)
 
             startEstimate = Eigen::Vector3f(stamped_pose.getOrigin().getX(),stamped_pose.getOrigin().getY(), yaw);
           }
+          // if failed, use last scan matching result
           catch(tf::TransformException e)
           {
             ROS_ERROR("Transform from %s to %s failed\n", p_map_frame_.c_str(), p_base_frame_.c_str());
@@ -305,9 +315,9 @@ void HectorMappingRos::scanCallback(const sensor_msgs::LaserScan& scan)
 
         // run scan matching with startEstimate (initial guess)
         if (p_map_with_known_poses_){
-          slamProcessor->update(laserScanContainer, startEstimate, true);
+          slamProcessor->update(laserScanContainer, startEstimate, true, p_do_mapping_);
         }else{
-          slamProcessor->update(laserScanContainer, startEstimate);
+          slamProcessor->update(laserScanContainer, startEstimate, false, p_do_mapping_);
         }
       }
 
@@ -329,6 +339,7 @@ void HectorMappingRos::scanCallback(const sensor_msgs::LaserScan& scan)
     return;
   }
 
+  // get last scan matching result as current pose
   poseInfoContainer_.update(slamProcessor->getLastScanMatchPose(), slamProcessor->getLastScanMatchCovariance(), scan.header.stamp, p_map_frame_);
 
   poseUpdatePublisher_.publish(poseInfoContainer_.getPoseWithCovarianceStamped());
