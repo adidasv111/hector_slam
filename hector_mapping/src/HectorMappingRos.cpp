@@ -557,15 +557,15 @@ void HectorMappingRos::setStaticMapData(const nav_msgs::OccupancyGrid& map)
       for (int x = 0; x < map_size_x; ++x)
       {
         int mapX = x * r + 0.5f, mapY = y * r + 0.5f;
-	if (!gridMap.hasGridValue(mapX, mapY)) continue;
-	int d = map.data[y * map_size_x + x];
-	if (d == 0) {
-	  gridMap.updateSetFree(mapX, mapY);
-	} else if (d == 100) {
+        if (!gridMap.hasGridValue(mapX, mapY)) continue;
+        int d = map.data[y * map_size_x + x];
+        if (d == 0) {
+          gridMap.updateSetFree(mapX, mapY);
+        } else if (d == 100) {
           gridMap.updateSetOccupied(mapX, mapY);
-	} else {
+        } else {
           // pass
-	}
+        }
       }
     }
     gridMap.stablize();
@@ -585,18 +585,18 @@ bool HectorMappingRos::loadStaticMap()
   ros::Duration waitTime(1.0);
   for (int i = 0; i < 3; i++)
   {
-    if (mapCli.call(srv)) goto succeed;
+    if (mapCli.call(srv)) 
+    {
+      setStaticMapData(srv.response.map);
+      ROS_INFO("HectorSM load static_map %s", "succeed");
+      return true;
+    }
     waitTime.sleep();
   }
 
-// fail:
+  // fail:
   ROS_INFO("HectorSM load static_map %s", "failed");
   return false;
-
-succeed:
-  setStaticMapData(srv.response.map);
-  ROS_INFO("HectorSM load static_map %s", "succeed");
-  return true;
 }
 
 void HectorMappingRos::publishMapLoop(double map_pub_period)
