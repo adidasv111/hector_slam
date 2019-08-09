@@ -74,10 +74,11 @@ public:
 
     Eigen::Vector3f newPoseEstimateWorld;
 
+    // run scan matching to get new pose of the robot
     if (!map_without_matching){
         newPoseEstimateWorld = (mapRep->matchData(poseHintWorld, dataContainer, lastScanMatchCov));
     }else{
-        newPoseEstimateWorld = poseHintWorld;
+        newPoseEstimateWorld = poseHintWorld; // if mapping with known poses, just take initial pose as new pose (skip scan matching)
     }
 
     lastScanMatchPose = newPoseEstimateWorld;
@@ -86,6 +87,7 @@ public:
 
     //std::cout << "\n1";
     //std::cout << "\n" << lastScanMatchPose << "\n";
+    // if moved by a certain distance, update map
     if(util::poseDifferenceLargerThan(newPoseEstimateWorld, lastMapUpdatePose, paramMinDistanceDiffForMapUpdate, paramMinAngleDiffForMapUpdate) || map_without_matching){
 
       mapRep->updateByScan(dataContainer, newPoseEstimateWorld);

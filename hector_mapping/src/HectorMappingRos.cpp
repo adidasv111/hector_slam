@@ -303,7 +303,7 @@ void HectorMappingRos::scanCallback(const sensor_msgs::LaserScan& scan)
           startEstimate = slamProcessor->getLastScanMatchPose();
         }
 
-
+        // run scan matching with startEstimate (initial guess)
         if (p_map_with_known_poses_){
           slamProcessor->update(laserScanContainer, startEstimate, true);
         }else{
